@@ -1,0 +1,105 @@
+# Tags the merge commit of a release PR (release/vX.Y.Z -> main) and publishes the
+# GitHub Release with the notes between the release-notes markers of the PR body.
+# The release PR is prepared by the release-pr skill (.claude/skills/release-pr).
+#
+# Recovery: Actions -> Release -> Run workflow with the number of the merged release PR.
+# Limitation: a release created with GITHUB_TOKEN does not trigger `on: release`
+# workflows; a future publish-on-release workflow needs a GitHub App token instead.
+name: Release
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: Number of the merged release PR
+        required: true
+        type: string
+
+# Unlisted scopes are set to none.
+permissions:
+  contents: write
+  pull-requests: read
+  issues: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.merged == true &&
+       startsWith(github.event.pull_request.head.ref, 'release/v') &&
+       github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PR: ${{ github.event.pull_request.number || inputs.pr }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Create tag and release
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$1"; exit 1; }
+
+          [[ "$PR" =~ ^[0-9]+$ ]] || fail "PR number '$PR' is not a number"
+          pr_info="$(gh pr view "$PR" --json state,baseRefName,headRefName,isCrossRepository,mergeCommit \
+            --jq '[.state, .baseRefName, .headRefName, (.isCrossRepository | tostring), (.mergeCommit.oid // "-")] | @tsv')"
+          IFS=$'\t' read -r state base head cross merge_sha <<< "$pr_info"
+          [[ "$state" == "MERGED" ]] || fail "PR #$PR is $state, not merged"
+          [[ "$base" == "main" ]] || fail "PR #$PR targets $base, not main"
+          [[ "$cross" == "false" ]] || fail "PR #$PR comes from a fork"
+          [[ "$head" =~ ^release/(v[0-9]+\.[0-9]+\.[0-9]+)$ ]] \
+            || fail "PR #$PR head '$head' is not release/vX.Y.Z"
+          version="${BASH_REMATCH[1]}"
+          [[ "$merge_sha" =~ ^[0-9a-f]{40}$ ]] || fail "PR #$PR has no merge commit"
+
+          if gh release view "$version" > /dev/null 2>&1; then
+            echo "Release $version already exists; nothing to do." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # Never move a tag: an existing tag must already point to the merge commit.
+          target=(--target "$merge_sha")
+          if git rev-parse -q --verify "refs/tags/$version" > /dev/null; then
+            [[ "$(git rev-parse "$version^{commit}")" == "$merge_sha" ]] \
+              || fail "tag $version exists but does not point to $merge_sha"
+            target=(--verify-tag)
+          fi
+
+          prev="$(git describe --tags --abbrev=0 --match 'v[0-9]*' "$merge_sha^1" 2> /dev/null || true)"
+          gh pr view "$PR" --json body --jq .body > "$RUNNER_TEMP/body.md"
+          notes_args=(notes "$RUNNER_TEMP/body.md" --version "$version" --repo "$GITHUB_REPOSITORY")
+          if [[ -n "$prev" ]]; then notes_args+=(--prev "$prev"); fi
+          python3 scripts/release/release_plan.py "${notes_args[@]}" > "$RUNNER_TEMP/notes.md"
+
+          gh release create "$version" "${target[@]}" --title "$version" --notes-file "$RUNNER_TEMP/notes.md"
+
+          url="$(gh release view "$version" --json url --jq .url)"
+          git fetch --quiet origin "refs/tags/$version:refs/tags/$version"
+          [[ "$(git rev-parse "$version^{commit}")" == "$merge_sha" ]] \
+            || fail "tag $version does not point to the merge commit $merge_sha"
+
+          git push origin --delete "$head" \
+            || echo "::warning::could not delete branch $head; delete it manually"
+
+          {
+            echo "Released [$version]($url) at \`$merge_sha\`${prev:+ (previous: $prev)}."
+            open_issues=""
+            while read -r number; do
+              issue_state="$(gh issue view "$number" --json state --jq .state || echo unknown)"
+              if [[ "$issue_state" != "CLOSED" ]]; then open_issues+=" #$number"; fi
+            done < <(sed -n 's/^Closes #\([0-9][0-9]*\)[[:space:]]*$/\1/p' "$RUNNER_TEMP/body.md")
+            if [[ -n "$open_issues" ]]; then
+              echo ""
+              echo "Still open at the time of this run (GitHub may close them a moment later):$open_issues"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

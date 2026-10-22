@@ -1,0 +1,16 @@
+{
+  "describe": null,
+  "log": [
+    {"sha": "4a9b9d8000000000000000000000000000000001", "parents": ["p1", "a5ab030"], "subject": "Merge pull request #1 from KuDim89/feature/create-issue-skill"},
+    {"sha": "8a3ad17000000000000000000000000000000002", "parents": ["p2", "f18fff5"], "subject": "Merge pull request #2 from KuDim89/feature/create-pr-skill"},
+    {"sha": "7b791e2000000000000000000000000000000003", "parents": ["p3", "8ab2485"], "subject": "Merge pull request #3 from KuDim89/feature/add-commit-skill"},
+    {"sha": "7ea2efc000000000000000000000000000000005", "parents": ["p5", "bd7d567"], "subject": "Merge pull request #5 from KuDim89/feature/create-pr-squash"}
+  ],
+  "prs": {
+    "1": {"number": 1, "title": "feat(tooling): add create-issue skill", "body": "Add a project skill that plans and creates one GitHub issue."},
+    "2": {"number": 2, "title": "feat(tooling): add create-pr skill", "body": "## What\nAdd a create-pr skill.\n\n## Why\nConsistent PRs."},
+    "3": {"number": 3, "title": "feat(tooling): add add-commit skill", "body": "## What\nAdd add-commit."},
+    "5": {"number": 5, "title": "feat(tooling): squash branch and return to development in create-pr", "body": "## What\nSquash."}
+  },
+  "issues": {}
+}

@@ -1,0 +1,22 @@
+{
+  "describe": "v0.3.1",
+  "log": [
+    {"sha": "aaaaaaa000000000000000000000000000000001", "parents": ["m0", "x1"], "subject": "Merge pull request #7 from KuDim89/feature/SI-12-oauth"},
+    {"sha": "bbbbbbb000000000000000000000000000000002", "parents": ["m1"], "subject": "fix(backend): [SI-15] fix login redirect (#8)"},
+    {"sha": "ccccccc000000000000000000000000000000003", "parents": ["m2"], "subject": "docs: fix typo in README"},
+    {"sha": "ddddddd000000000000000000000000000000004", "parents": ["m3", "x4"], "subject": "Merge branch 'main' into development"},
+    {"sha": "eeeeeee000000000000000000000000000000005", "parents": ["m4", "x5"], "subject": "Merge pull request #9 from KuDim89/chore/deps"}
+  ],
+  "prs": {
+    "7": {"number": 7, "title": "feat(backend): [SI-12] add OAuth login for the API", "body": "## What\nOAuth.\n\nPart of SI-12 (#12)."},
+    "8": {"number": 8, "title": "fix(backend): [SI-15] fix login redirect", "body": "Fixes #15. Refs #20, see also #21.\n\nCloses SI-12 (#12)"},
+    "9": {"number": 9, "title": "update dependencies", "body": "closes #30\nresolves #31\nCloses #32"}
+  },
+  "issues": {
+    "12": {"state": "OPEN"},
+    "15": {"state": "OPEN"},
+    "30": {"state": "CLOSED"},
+    "31": "pr",
+    "32": "missing"
+  }
+}
